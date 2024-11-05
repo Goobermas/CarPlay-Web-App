@@ -1,0 +1,91 @@
+html, body {
+    height: 100%;
+    margin: 0;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    background-color: black; /* Changed to black to frame rounded background */
+    color: black;
+    font-family: Arial, sans-serif;
+    position: relative;
+    overflow: hidden;
+}
+
+.background {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    width: 90vw;
+    height: 90vh;
+    transform: translate(-50%, -50%) scale(1.1);
+    background-size: cover;
+    background-position: center;
+    background-image: url(''); /* Your background image URL */
+    border-radius: 20px; /* Round corners for CarPlay look */
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.7); /* Add shadow for depth */
+}
+
+.background::after {
+    content: "";
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    backdrop-filter: blur(65px);
+    pointer-events: none;
+    background-color: rgba(0, 0, 0, 0.3); /* Dark filter */
+}
+
+.carplay-container {
+    display: flex;
+    justify-content: flex-start;
+    align-items: center;
+    height: 100vh;
+    position: relative;
+    z-index: 1;
+    padding-left: 40vw;
+}
+
+.album-art {
+    position: fixed;
+    right: 60px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 30vw;
+    max-width: 300px;
+    border-radius: 10px;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.7);
+}
+
+/* Hidden class to hide the container initially */
+.hidden {
+    visibility: hidden;
+}
+
+.song-info {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    margin-right: 500px;
+    margin-left: -160px; /* Moved 100px more to the left */
+    margin-top: -100px; /* Move song info 60px up */
+    z-index: 1;
+    position: relative; /* Relative positioning for the title */
+    overflow: hidden; /* Hide overflow */
+}
+
+.title {
+    font-size: 50px;
+    font-weight: bold;
+    color: white;
+    white-space: nowrap; /* Prevent wrapping */
+    overflow: hidden; /* Hide overflow text */
+    text-overflow: ellipsis; /* Show ellipsis for truncated text */
+    position: relative; /* Position relative for the pseudo-element */
+}
+
+.artist {
+    font-size: 20px;
+    color: white;
+    text-align: center;
+    margin-top: -20px; /* Move artist name up by 20px */
+}

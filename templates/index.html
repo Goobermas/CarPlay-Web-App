@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Spotify Companion</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+</head>
+<body>
+    <div class="background" id="background-art"></div>
+    <div class="carplay-container hidden"> <!-- Added hidden class here -->
+        <div class="song-info">
+            <div class="title-box">
+                <p id="song-title" class="title" data-title="">Song Title</p>
+            </div>
+            <div id="artist-name" class="artist">Artist Name</div>
+        </div>
+        <img id="album-art" src="" alt="Album Art" class="album-art">
+    </div>
+    <script src="{{ url_for('static', filename='js/script.js') }}"></script>
+</body>
+</html>
