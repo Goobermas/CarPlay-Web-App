@@ -1,7 +1,6 @@
 import os
 from flask import Flask, redirect, request, session, jsonify, render_template
 import requests
-import time
 
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'default_secret_key')
@@ -13,20 +12,15 @@ SPOTIFY_AUTH_URL = 'https://accounts.spotify.com/authorize'
 SPOTIFY_TOKEN_URL = 'https://accounts.spotify.com/api/token'
 SPOTIFY_API_URL = 'https://api.spotify.com/v1/me/player/currently-playing'
 SPOTIFY_CONTROL_URL = 'https://api.spotify.com/v1/me/player'
+SPOTIFY_USER_URL = 'https://api.spotify.com/v1/me'
+
+# Store user tokens in memory (Better: Use a database like Redis)
+user_tokens = {}
 
 @app.route('/')
 def home():
-    if 'access_token' in session:
-        return redirect('/carplay')
-    else:
-        auth_url = f"{SPOTIFY_AUTH_URL}?client_id={CLIENT_ID}&response_type=code&redirect_uri={REDIRECT_URI}&scope=user-read-playback-state user-modify-playback-state"
-        return redirect(auth_url)
-
-@app.route('/carplay')
-def carplay():
-    if 'access_token' in session:
-        return render_template('index.html')
-    return redirect('/')
+    auth_url = f"{SPOTIFY_AUTH_URL}?client_id={CLIENT_ID}&response_type=code&redirect_uri={REDIRECT_URI}&scope=user-read-playback-state user-modify-playback-state"
+    return redirect(auth_url)
 
 @app.route('/callback')
 def callback():
@@ -42,18 +36,39 @@ def callback():
     token_info = response.json()
     
     if 'access_token' in token_info:
-        session['access_token'] = token_info['access_token']
-        session['refresh_token'] = token_info['refresh_token']
-        return redirect('/carplay')
-    else:
-        return jsonify({'error': 'Failed to authenticate with Spotify'}), 400
+        access_token = token_info['access_token']
+        
+        # Get user ID from Spotify
+        headers = {'Authorization': f"Bearer {access_token}"}
+        user_response = requests.get(SPOTIFY_USER_URL, headers=headers)
+        if user_response.status_code == 200:
+            user_data = user_response.json()
+            user_id = user_data['id']
+            
+            # Store tokens per user
+            user_tokens[user_id] = {
+                'access_token': token_info['access_token'],
+                'refresh_token': token_info.get('refresh_token')
+            }
+            session['user_id'] = user_id
+            return redirect('/carplay')
+        else:
+            return jsonify({'error': 'Failed to fetch user info from Spotify'}), 400
+    return jsonify({'error': 'Failed to authenticate with Spotify'}), 400
+
+@app.route('/carplay')
+def carplay():
+    if 'user_id' in session:
+        return render_template('index.html')
+    return redirect('/')
 
 @app.route('/now-playing')
 def now_playing():
-    access_token = session.get('access_token')
-    if not access_token:
+    user_id = session.get('user_id')
+    if not user_id or user_id not in user_tokens:
         return jsonify({'error': 'User not authenticated'}), 401
 
+    access_token = user_tokens[user_id]['access_token']
     headers = {'Authorization': f"Bearer {access_token}"}
     response = requests.get(SPOTIFY_API_URL, headers=headers)
 
@@ -77,10 +92,11 @@ def now_playing():
 
 @app.route('/control/<action>')
 def control(action):
-    access_token = session.get('access_token')
-    if not access_token:
+    user_id = session.get('user_id')
+    if not user_id or user_id not in user_tokens:
         return jsonify({'error': 'User not authenticated'}), 401
 
+    access_token = user_tokens[user_id]['access_token']
     headers = {'Authorization': f"Bearer {access_token}"}
     actions = {
         'play': lambda: requests.put(f'{SPOTIFY_CONTROL_URL}/play', headers=headers),
