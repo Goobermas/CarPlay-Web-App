@@ -1,4 +1,4 @@
 Flask
-requests
 python-dotenv
-gunicorn
+requests
+supabase
