@@ -5,6 +5,8 @@ from supabase import create_client, Client
 from dotenv import load_dotenv
 from flask_socketio import SocketIO, emit
 import eventlet
+import threading
+import time
 
 # Patch for async support
 eventlet.monkey_patch()
@@ -16,7 +18,7 @@ SUPABASE_KEY = os.environ.get("SUPABASE_KEY")
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 app = Flask(__name__)
-socketio = SocketIO(app)
+socketio = SocketIO(app, async_mode='eventlet')
 app.secret_key = os.getenv('SECRET_KEY', 'default_secret_key')
 
 CLIENT_ID = os.getenv('SPOTIFY_CLIENT_ID')
@@ -26,7 +28,32 @@ SPOTIFY_AUTH_URL = 'https://accounts.spotify.com/authorize'
 SPOTIFY_TOKEN_URL = 'https://accounts.spotify.com/api/token'
 SPOTIFY_USER_URL = 'https://api.spotify.com/v1/me'
 SPOTIFY_API_URL = 'https://api.spotify.com/v1/me/player/currently-playing'
-SPOTIFY_CONTROL_URL = 'https://api.spotify.com/v1/me/player'
+
+track_cache = {}
+
+def background_now_playing():
+    while True:
+        with app.app_context():
+            user_id = session.get('user_id')
+            access_token = session.get('access_token')
+            if not access_token:
+                time.sleep(5)
+                continue
+
+            headers = {'Authorization': f"Bearer {access_token}"}
+            response = requests.get(SPOTIFY_API_URL, headers=headers)
+
+            if response.status_code == 200 and response.json():
+                track_data = response.json()
+                track_info = {
+                    'name': track_data['item']['name'],
+                    'artist': track_data['item']['artists'][0]['name'],
+                    'album_art': track_data['item']['album']['images'][0]['url']
+                }
+                if track_info != track_cache.get(user_id):
+                    track_cache[user_id] = track_info
+                    socketio.emit('track_update', track_info)
+        time.sleep(2)
 
 @app.route('/')
 def home():
@@ -105,31 +132,13 @@ def dashboard():
         <a href="/logout"><button>Log Out</button></a>
     ''', user_id=user_id, display_name=display_name, email=email)
 
-@app.route('/now-playing')
-def now_playing():
-    access_token = session.get('access_token')
-    if not access_token:
-        return jsonify({'error': 'User not authenticated'}), 401
-
-    headers = {'Authorization': f"Bearer {access_token}"}
-    response = requests.get(SPOTIFY_API_URL, headers=headers)
-
-    if response.status_code == 200 and response.json():
-        track_data = response.json()
-        track_info = {
-            'name': track_data['item']['name'],
-            'artist': track_data['item']['artists'][0]['name'],
-            'album_art': track_data['item']['album']['images'][0]['url']
-        }
-        socketio.emit('track_update', track_info)
-        return jsonify(track_info)
-    else:
-        return jsonify({'error': 'No track playing or token expired'}), 204
-
 @app.route('/logout')
 def logout():
     session.clear()
     return redirect('/')
 
 if __name__ == '__main__':
+    background_thread = threading.Thread(target=background_now_playing)
+    background_thread.daemon = True
+    background_thread.start()
     socketio.run(app, host='0.0.0.0', port=5000)
