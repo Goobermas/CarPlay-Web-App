@@ -1,4 +1,5 @@
 import os
+import requests
 from flask import Flask, redirect, request, session, jsonify, render_template
 from supabase import create_client, Client
 from dotenv import load_dotenv
