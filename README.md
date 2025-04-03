@@ -1,3 +1,4 @@
+[![Deploy](https://www.herokucdn.com/deploy/button.svg)](https://www.heroku.com/deploy?template=https://github.com/Goobermas/CarPlay-Web-App)<br>
 This is meant to "replace" Car Play for 0$ mount it in your car in landscape mode and mimic Car Play's current playing for 0$.<br>
 Works with Spotify Free and Premium.
 
