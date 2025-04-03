@@ -3,76 +3,53 @@ let currentArtistName = '';
 let currentAlbumArt = '';
 let contentLoaded = false;
 
-async function fetchNowPlaying() {
-    try {
-        const response = await fetch('/now-playing');
-        if (response.ok) {
-            const data = await response.json();
-            console.log("Data received:", data);
+const socket = io();
 
-            // Preload album art if it's different from the current one
-            if (data.album_art !== currentAlbumArt) {
-                currentAlbumArt = data.album_art;
-                preloadImage(currentAlbumArt, () => {
-                    document.getElementById('album-art').src = currentAlbumArt;
-                    document.querySelector('.background').style.backgroundImage = `url(${currentAlbumArt})`;
-                });
-            }
+socket.on('connect', () => {
+    console.log('Connected to server via WebSocket');
+});
 
-            const newSongTitle = data.name;
-            const newArtistName = data.artist;
+socket.on('track_update', data => {
+    console.log("Track update received:", data);
 
-            if (newSongTitle !== currentSongTitle || newArtistName !== currentArtistName) {
-                currentSongTitle = newSongTitle;
-                currentArtistName = newArtistName;
-
-                const songTitleElement = document.getElementById('song-title');
-                songTitleElement.textContent = newSongTitle;
-                songTitleElement.setAttribute('data-title', newSongTitle);
-
-                let fontSize = 50;
-                if (newSongTitle.length > 15) {
-                    const excessChars = newSongTitle.length - 15;
-                    fontSize -= excessChars * 1.3;
-                    fontSize = Math.max(fontSize, 25);
-                }
-                songTitleElement.style.fontSize = `${fontSize}px`;
-
-                document.getElementById('artist-name').textContent = newArtistName;
-            }
-
-            if (!contentLoaded) {
-                document.querySelector('.carplay-container').classList.remove('hidden');
-                contentLoaded = true;
-            }
-
-        } else {
-            console.error('Error fetching now playing:', response.status);
-        }
-    } catch (error) {
-        console.error('Error fetching now playing:', error);
+    if (data.album_art !== currentAlbumArt) {
+        currentAlbumArt = data.album_art;
+        preloadImage(currentAlbumArt, () => {
+            document.getElementById('album-art').src = currentAlbumArt;
+            document.querySelector('.background').style.backgroundImage = `url(${currentAlbumArt})`;
+        });
     }
-}
 
-// Preload an image and call a callback once it’s loaded
+    if (data.name !== currentSongTitle || data.artist !== currentArtistName) {
+        currentSongTitle = data.name;
+        currentArtistName = data.artist;
+
+        const songTitleElement = document.getElementById('song-title');
+        songTitleElement.textContent = currentSongTitle;
+        songTitleElement.setAttribute('data-title', currentSongTitle);
+
+        let fontSize = 50;
+        if (currentSongTitle.length > 15) {
+            const excessChars = currentSongTitle.length - 15;
+            fontSize -= excessChars * 1.3;
+            fontSize = Math.max(fontSize, 25);
+        }
+        songTitleElement.style.fontSize = `${fontSize}px`;
+
+        document.getElementById('artist-name').textContent = currentArtistName;
+    }
+
+    if (!contentLoaded) {
+        document.querySelector('.carplay-container').classList.remove('hidden');
+        contentLoaded = true;
+    }
+});
+
 function preloadImage(src, callback) {
     const img = new Image();
     img.src = src;
     img.onload = callback;
 }
-
-// Poll every 2 seconds
-setInterval(fetchNowPlaying, 2000);
-
-document.addEventListener('DOMContentLoaded', () => {
-    document.body.addEventListener('click', () => {
-        if (document.documentElement.requestFullscreen) {
-            document.documentElement.requestFullscreen();
-        } else if (document.documentElement.webkitRequestFullscreen) {
-            document.documentElement.webkitRequestFullscreen();
-        }
-    });
-});
 
 let wakeLock = null;
 
@@ -97,5 +74,12 @@ document.addEventListener('visibilitychange', () => {
 });
 
 document.addEventListener('DOMContentLoaded', () => {
+    document.body.addEventListener('click', () => {
+        if (document.documentElement.requestFullscreen) {
+            document.documentElement.requestFullscreen();
+        } else if (document.documentElement.webkitRequestFullscreen) {
+            document.documentElement.webkitRequestFullscreen();
+        }
+    });
     requestWakeLock();
 });
