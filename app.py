@@ -7,6 +7,8 @@ from flask_socketio import SocketIO, emit
 import eventlet
 from threading import Thread
 import time
+import urllib3
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 # Patch for async support
 eventlet.monkey_patch()
