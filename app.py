@@ -1,6 +1,6 @@
 import os
 import requests
-from flask import Flask, redirect, request, session, jsonify, render_template
+from flask import Flask, redirect, request, session, jsonify, render_template_string
 from supabase import create_client, Client
 from dotenv import load_dotenv
 
@@ -79,6 +79,11 @@ def dashboard():
         <p><strong>Email:</strong> {{ email }}</p>
         <a href="/logout"><button>Log Out</button></a>
     ''', user_id=user_id, display_name=display_name, email=email)
+
+@app.route('/logout')
+def logout():
+    session.clear()
+    return redirect('/')
 
 if __name__ == '__main__':
     app.run(debug=True)
