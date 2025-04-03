@@ -56,8 +56,8 @@ def callback():
 
     user_data = user_response.json()
     user_id = user_data.get('id')
-    display_name = user_data.get('display_name')
-    email = user_data.get('email')
+    display_name = user_data.get('display_name') or 'No Name'
+    email = user_data.get('email') or 'noemail@example.com'
 
     result = supabase.table("users").upsert({
         "id": user_id,
