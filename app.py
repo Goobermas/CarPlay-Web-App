@@ -44,6 +44,7 @@ def callback():
     token_info = token_response.json()
 
     if 'access_token' not in token_info:
+        print("Spotify token response:", token_response.status_code, token_response.text)
         return jsonify({'error': 'Failed to authenticate with Spotify'}), 400
 
     access_token = token_info['access_token']
@@ -52,23 +53,29 @@ def callback():
     user_response = requests.get(SPOTIFY_USER_URL, headers=headers)
 
     if user_response.status_code != 200:
+        print("Spotify /me response:", user_response.status_code, user_response.text)
         return jsonify({'error': 'Failed to fetch user info from Spotify'}), 400
 
-    user_data = user_response.json()
-    user_id = user_data.get('id')
-    display_name = user_data.get('display_name') or 'No Name'
-    email = user_data.get('email') or 'noemail@example.com'
+    try:
+        user_data = user_response.json()
+        user_id = user_data.get('id')
+        display_name = user_data.get('display_name') or 'No Name'
+        email = user_data.get('email') or 'noemail@example.com'
 
-    result = supabase.table("users").upsert({
-        "id": user_id,
-        "email": email,
-        "display_name": display_name,
-        "access_token": access_token,
-        "refresh_token": refresh_token
-    }).execute()
+        result = supabase.table("users").upsert({
+            "id": user_id,
+            "email": email,
+            "display_name": display_name,
+            "access_token": access_token,
+            "refresh_token": refresh_token
+        }).execute()
 
-    session['user_id'] = user_id
-    session['access_token'] = access_token
+        session['user_id'] = user_id
+        session['access_token'] = access_token
+    except Exception as e:
+        print("User data error:", str(e))
+        return jsonify({'error': 'Spotify user data malformed'}), 400
+
     return redirect('/carplay')
 
 @app.route('/carplay')
