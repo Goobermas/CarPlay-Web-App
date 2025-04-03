@@ -1,6 +1,6 @@
 import os
 import requests
-from flask import Flask, redirect, request, session, jsonify, render_template_string
+from flask import Flask, redirect, request, session, jsonify, render_template, render_template_string
 from supabase import create_client, Client
 from dotenv import load_dotenv
 
@@ -19,11 +19,16 @@ REDIRECT_URI = os.getenv('REDIRECT_URI')
 SPOTIFY_AUTH_URL = 'https://accounts.spotify.com/authorize'
 SPOTIFY_TOKEN_URL = 'https://accounts.spotify.com/api/token'
 SPOTIFY_USER_URL = 'https://api.spotify.com/v1/me'
+SPOTIFY_API_URL = 'https://api.spotify.com/v1/me/player/currently-playing'
+SPOTIFY_CONTROL_URL = 'https://api.spotify.com/v1/me/player'
 
 @app.route('/')
 def home():
-    auth_url = f"{SPOTIFY_AUTH_URL}?client_id={CLIENT_ID}&response_type=code&redirect_uri={REDIRECT_URI}&scope=user-read-email user-read-private"
-    return redirect(auth_url)
+    if 'access_token' in session:
+        return redirect('/carplay')
+    else:
+        auth_url = f"{SPOTIFY_AUTH_URL}?client_id={CLIENT_ID}&response_type=code&redirect_uri={REDIRECT_URI}&scope=user-read-playback-state user-modify-playback-state user-read-email user-read-private"
+        return redirect(auth_url)
 
 @app.route('/callback')
 def callback():
@@ -63,7 +68,14 @@ def callback():
     }).execute()
 
     session['user_id'] = user_id
-    return redirect('/dashboard')
+    session['access_token'] = access_token
+    return redirect('/carplay')
+
+@app.route('/carplay')
+def carplay():
+    if 'access_token' in session:
+        return render_template('index.html')
+    return redirect('/')
 
 @app.route('/dashboard')
 def dashboard():
@@ -80,10 +92,30 @@ def dashboard():
         <a href="/logout"><button>Log Out</button></a>
     ''', user_id=user_id, display_name=display_name, email=email)
 
+@app.route('/now-playing')
+def now_playing():
+    access_token = session.get('access_token')
+    if not access_token:
+        return jsonify({'error': 'User not authenticated'}), 401
+
+    headers = {'Authorization': f"Bearer {access_token}"}
+    response = requests.get(SPOTIFY_API_URL, headers=headers)
+
+    if response.status_code == 200 and response.json():
+        track_data = response.json()
+        track_info = {
+            'name': track_data['item']['name'],
+            'artist': track_data['item']['artists'][0]['name'],
+            'album_art': track_data['item']['album']['images'][0]['url']
+        }
+        return jsonify(track_info)
+    else:
+        return jsonify({'error': 'No track playing or token expired'}), 204
+
 @app.route('/logout')
 def logout():
     session.clear()
     return redirect('/')
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run(host='0.0.0.0', port=5000, debug=True)
