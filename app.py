@@ -1,14 +1,15 @@
+import os
 from flask import Flask, redirect, request, session, jsonify, render_template
 import requests
 import time
 
 app = Flask(__name__)
-app.secret_key = 'your_secret_key'  # Replace with a secure key in production
+app.secret_key = os.environ.get('SECRET_KEY', 'default_secret_key')  # Use environment variable or fallback to a default key
 
-# Spotify API info
-CLIENT_ID = 'cd1e42e0d54146e08575481eaab4f3b8'
-CLIENT_SECRET = '892b295926c74022a02cf8a291593b59'
-REDIRECT_URI = 'http://localhost:5000/callback'
+# Spotify API info from environment variables
+CLIENT_ID = os.environ.get('SPOTIFY_CLIENT_ID')
+CLIENT_SECRET = os.environ.get('SPOTIFY_CLIENT_SECRET')
+REDIRECT_URI = os.environ.get('REDIRECT_URI', 'http://localhost:5000/callback')  # Default fallback URL
 SPOTIFY_AUTH_URL = 'https://accounts.spotify.com/authorize'
 SPOTIFY_TOKEN_URL = 'https://accounts.spotify.com/api/token'
 SPOTIFY_API_URL = 'https://api.spotify.com/v1/me/player/currently-playing'
