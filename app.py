@@ -22,7 +22,7 @@ SPOTIFY_USER_URL = 'https://api.spotify.com/v1/me'
 
 @app.route('/')
 def home():
-    auth_url = f"{SPOTIFY_AUTH_URL}?client_id={CLIENT_ID}&response_type=code&redirect_uri={REDIRECT_URI}&scope=user-read-playback-state user-modify-playback-state"
+    auth_url = f"{SPOTIFY_AUTH_URL}?client_id={CLIENT_ID}&response_type=code&redirect_uri={REDIRECT_URI}&scope=user-read-email user-read-private"
     return redirect(auth_url)
 
 @app.route('/callback')
@@ -35,37 +35,41 @@ def callback():
         'client_id': CLIENT_ID,
         'client_secret': CLIENT_SECRET
     }
-    response = requests.post(SPOTIFY_TOKEN_URL, data=data)
-    token_info = response.json()
+    token_response = requests.post(SPOTIFY_TOKEN_URL, data=data)
+    token_info = token_response.json()
 
-    if 'access_token' in token_info:
-        access_token = token_info['access_token']
-        refresh_token = token_info['refresh_token']
+    if 'access_token' not in token_info:
+        return jsonify({'error': 'Failed to authenticate with Spotify'}), 400
 
-        headers = {'Authorization': f"Bearer {access_token}"}
-        user_response = requests.get(SPOTIFY_USER_URL, headers=headers)
-        if user_response.status_code == 200:
-            user_data = user_response.json()
-            user_id = user_data['id']
+    access_token = token_info['access_token']
+    refresh_token = token_info.get('refresh_token')
+    headers = {'Authorization': f"Bearer {access_token}"}
+    user_response = requests.get(SPOTIFY_USER_URL, headers=headers)
 
-            # Insert or update the user in Supabase
-            supabase.table("users").upsert({
-                "id": user_id,
-                "access_token": access_token,
-                "refresh_token": refresh_token
-            }).execute()
+    if user_response.status_code != 200:
+        return jsonify({'error': 'Failed to fetch user info from Spotify'}), 400
 
-            session['user_id'] = user_id
-            return redirect('/dashboard')
-        else:
-            return jsonify({'error': 'Failed to fetch user info'}), 400
-    return jsonify({'error': 'Failed to authenticate with Spotify'}), 400
+    user_data = user_response.json()
+    user_id = user_data.get('id')
+    display_name = user_data.get('display_name')
+    email = user_data.get('email')
+
+    result = supabase.table("users").upsert({
+        "id": user_id,
+        "email": email,
+        "display_name": display_name,
+        "access_token": access_token,
+        "refresh_token": refresh_token
+    }).execute()
+
+    session['user_id'] = user_id
+    return redirect('/dashboard')
 
 @app.route('/dashboard')
 def dashboard():
     if 'user_id' not in session:
         return redirect('/')
-    return f"Welcome, Spotify user {session['user_id']}!"
+    return f"You are logged in as Spotify user {session['user_id']}"
 
 if __name__ == '__main__':
     app.run(debug=True)
