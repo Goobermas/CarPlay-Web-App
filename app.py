@@ -52,7 +52,7 @@ def callback():
         'client_id': CLIENT_ID,
         'client_secret': CLIENT_SECRET
     }
-    token_response = requests.post(SPOTIFY_TOKEN_URL, data=data)
+    token_response = requests.post(SPOTIFY_TOKEN_URL, data=data, verify=False)
     token_info = token_response.json()
 
     if 'access_token' not in token_info:
