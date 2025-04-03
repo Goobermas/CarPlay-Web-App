@@ -1,43 +1,35 @@
-let currentSongTitle = '';
-let currentArtistName = '';
-let currentAlbumArt = '';
+let socket = io();
 let contentLoaded = false;
 
-const socket = io();
-
 socket.on('connect', () => {
-    console.log('Connected to server via WebSocket');
+    console.log("Connected to Socket.IO");
 });
 
 socket.on('track_update', data => {
-    console.log("Track update received:", data);
+    console.log("New track received:", data);
 
-    if (data.album_art !== currentAlbumArt) {
-        currentAlbumArt = data.album_art;
-        preloadImage(currentAlbumArt, () => {
-            document.getElementById('album-art').src = currentAlbumArt;
-            document.querySelector('.background').style.backgroundImage = `url(${currentAlbumArt})`;
-        });
+    const newSongTitle = data.name;
+    const newArtistName = data.artist;
+    const newAlbumArt = data.album_art;
+
+    preloadImage(newAlbumArt, () => {
+        document.getElementById('album-art').src = newAlbumArt;
+        document.querySelector('.background').style.backgroundImage = `url(${newAlbumArt})`;
+    });
+
+    const songTitleElement = document.getElementById('song-title');
+    songTitleElement.textContent = newSongTitle;
+    songTitleElement.setAttribute('data-title', newSongTitle);
+
+    let fontSize = 50;
+    if (newSongTitle.length > 15) {
+        const excessChars = newSongTitle.length - 15;
+        fontSize -= excessChars * 1.3;
+        fontSize = Math.max(fontSize, 25);
     }
+    songTitleElement.style.fontSize = `${fontSize}px`;
 
-    if (data.name !== currentSongTitle || data.artist !== currentArtistName) {
-        currentSongTitle = data.name;
-        currentArtistName = data.artist;
-
-        const songTitleElement = document.getElementById('song-title');
-        songTitleElement.textContent = currentSongTitle;
-        songTitleElement.setAttribute('data-title', currentSongTitle);
-
-        let fontSize = 50;
-        if (currentSongTitle.length > 15) {
-            const excessChars = currentSongTitle.length - 15;
-            fontSize -= excessChars * 1.3;
-            fontSize = Math.max(fontSize, 25);
-        }
-        songTitleElement.style.fontSize = `${fontSize}px`;
-
-        document.getElementById('artist-name').textContent = currentArtistName;
-    }
+    document.getElementById('artist-name').textContent = newArtistName;
 
     if (!contentLoaded) {
         document.querySelector('.carplay-container').classList.remove('hidden');
@@ -50,6 +42,16 @@ function preloadImage(src, callback) {
     img.src = src;
     img.onload = callback;
 }
+
+document.addEventListener('DOMContentLoaded', () => {
+    document.body.addEventListener('click', () => {
+        if (document.documentElement.requestFullscreen) {
+            document.documentElement.requestFullscreen();
+        } else if (document.documentElement.webkitRequestFullscreen) {
+            document.documentElement.webkitRequestFullscreen();
+        }
+    });
+});
 
 let wakeLock = null;
 
@@ -74,12 +76,5 @@ document.addEventListener('visibilitychange', () => {
 });
 
 document.addEventListener('DOMContentLoaded', () => {
-    document.body.addEventListener('click', () => {
-        if (document.documentElement.requestFullscreen) {
-            document.documentElement.requestFullscreen();
-        } else if (document.documentElement.webkitRequestFullscreen) {
-            document.documentElement.webkitRequestFullscreen();
-        }
-    });
     requestWakeLock();
 });
