@@ -3,6 +3,11 @@ import requests
 from flask import Flask, redirect, request, session, jsonify, render_template, render_template_string
 from supabase import create_client, Client
 from dotenv import load_dotenv
+from flask_socketio import SocketIO, emit
+import eventlet
+
+# Patch for async support
+eventlet.monkey_patch()
 
 load_dotenv()
 
@@ -11,6 +16,7 @@ SUPABASE_KEY = os.environ.get("SUPABASE_KEY")
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 app = Flask(__name__)
+socketio = SocketIO(app)
 app.secret_key = os.getenv('SECRET_KEY', 'default_secret_key')
 
 CLIENT_ID = os.getenv('SPOTIFY_CLIENT_ID')
@@ -62,7 +68,7 @@ def callback():
         display_name = user_data.get('display_name') or 'No Name'
         email = user_data.get('email') or 'noemail@example.com'
 
-        result = supabase.table("users").upsert({
+        supabase.table("users").upsert({
             "id": user_id,
             "email": email,
             "display_name": display_name,
@@ -115,6 +121,7 @@ def now_playing():
             'artist': track_data['item']['artists'][0]['name'],
             'album_art': track_data['item']['album']['images'][0]['url']
         }
+        socketio.emit('track_update', track_info)
         return jsonify(track_info)
     else:
         return jsonify({'error': 'No track playing or token expired'}), 204
@@ -125,4 +132,4 @@ def logout():
     return redirect('/')
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    socketio.run(app, host='0.0.0.0', port=5000)
