@@ -14,7 +14,6 @@ SPOTIFY_TOKEN_URL = 'https://accounts.spotify.com/api/token'
 SPOTIFY_API_URL = 'https://api.spotify.com/v1/me/player/currently-playing'
 SPOTIFY_CONTROL_URL = 'https://api.spotify.com/v1/me/player'
 
-# Serve CarPlay screen after login
 @app.route('/')
 def home():
     if 'access_token' in session:
@@ -59,21 +58,21 @@ def now_playing():
     response = requests.get(SPOTIFY_API_URL, headers=headers)
 
     if response.status_code == 200:
-        track_data = response.json()
-        if track_data and 'item' in track_data:
-            track_info = {
-                'name': track_data['item']['name'],
-                'artist': track_data['item']['artists'][0]['name'],
-                'album_art': track_data['item']['album']['images'][0]['url']
-            }
-            return jsonify(track_info)
-
-    elif response.status_code == 204:
-        return jsonify({'error': 'No track currently playing'}), 204
-
+        try:
+            track_data = response.json()
+            if track_data and 'item' in track_data:
+                track_info = {
+                    'name': track_data['item']['name'],
+                    'artist': track_data['item']['artists'][0]['name'],
+                    'album_art': track_data['item']['album']['images'][0]['url']
+                }
+                return jsonify(track_info)
+            else:
+                return jsonify({'error': 'No track currently playing'}), 204
+        except ValueError:
+            return jsonify({'error': 'Invalid JSON response from Spotify'}), 500
     elif response.status_code == 401:
         return jsonify({'error': 'Access token expired, please re-authenticate'}), 401
-
     return jsonify({'error': 'Failed to fetch currently playing track'}), 500
 
 @app.route('/control/<action>')
@@ -84,14 +83,18 @@ def control(action):
 
     headers = {'Authorization': f"Bearer {access_token}"}
     actions = {
-        'play': requests.put(f'{SPOTIFY_CONTROL_URL}/play', headers=headers),
-        'pause': requests.put(f'{SPOTIFY_CONTROL_URL}/pause', headers=headers),
-        'next': requests.post(f'{SPOTIFY_CONTROL_URL}/next', headers=headers),
-        'previous': requests.post(f'{SPOTIFY_CONTROL_URL}/previous', headers=headers)
+        'play': lambda: requests.put(f'{SPOTIFY_CONTROL_URL}/play', headers=headers),
+        'pause': lambda: requests.put(f'{SPOTIFY_CONTROL_URL}/pause', headers=headers),
+        'next': lambda: requests.post(f'{SPOTIFY_CONTROL_URL}/next', headers=headers),
+        'previous': lambda: requests.post(f'{SPOTIFY_CONTROL_URL}/previous', headers=headers)
     }
     
     if action in actions:
-        return '', 204
+        try:
+            actions[action]()
+            return '', 204
+        except requests.RequestException:
+            return jsonify({'error': 'Failed to execute action'}), 500
     return jsonify({'error': 'Invalid action'}), 400
 
 if __name__ == '__main__':
