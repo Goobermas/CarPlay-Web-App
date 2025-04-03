@@ -69,7 +69,16 @@ def callback():
 def dashboard():
     if 'user_id' not in session:
         return redirect('/')
-    return f"You are logged in as Spotify user {session['user_id']}"
+    user_id = session['user_id']
+    user_data = supabase.table("users").select("display_name, email").eq("id", user_id).single().execute()
+    display_name = user_data.data.get("display_name", "Unknown")
+    email = user_data.data.get("email", "Unknown")
+    return render_template_string('''
+        <h1>You are logged in as Spotify user {{ user_id }}</h1>
+        <p><strong>Display Name:</strong> {{ display_name }}</p>
+        <p><strong>Email:</strong> {{ email }}</p>
+        <a href="/logout"><button>Log Out</button></a>
+    ''', user_id=user_id, display_name=display_name, email=email)
 
 if __name__ == '__main__':
     app.run(debug=True)
