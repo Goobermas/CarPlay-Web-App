@@ -1,0 +1,27 @@
+{
+  "name": "Spotify CarPlay App",
+  "description": "Mimics the CarPlay currently playing page from Apple CarPlay head units. ",
+  "repository": "https://github.com/Goobermas/CarPlay-Web-App",
+  "logo": "https://your-logo-url.com/logo.png",
+  "keywords": ["spotify", "carplay", "flask"],
+  "env": {
+    "SPOTIFY_CLIENT_ID": {
+      "description": "Your Spotify Client ID"
+    },
+    "SPOTIFY_CLIENT_SECRET": {
+      "description": "Your Spotify Client Secret"
+    },
+    "SECRET_KEY": {
+      "description": "A secret key for Flask sessions",
+      "generator": "secret"
+    },
+    "REDIRECT_URI": {
+      "description": "The URI to redirect to after Spotify authorization",
+      "value": "http://localhost:5000/callback"
+    }
+  },
+  "scripts": {
+    "postdeploy": "echo 'App deployed successfully!'"
+  },
+  "addons": []
+}
