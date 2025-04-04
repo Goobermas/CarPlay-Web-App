@@ -3,15 +3,6 @@ import requests
 from flask import Flask, redirect, request, session, jsonify, render_template, render_template_string
 from supabase import create_client, Client
 from dotenv import load_dotenv
-from flask_socketio import SocketIO, emit
-import eventlet
-from threading import Thread
-import time
-import urllib3
-urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
-
-# Patch for async support
-eventlet.monkey_patch()
 
 load_dotenv()
 
@@ -20,7 +11,6 @@ SUPABASE_KEY = os.environ.get("SUPABASE_KEY")
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 app = Flask(__name__)
-socketio = SocketIO(app, async_mode='eventlet')
 app.secret_key = os.getenv('SECRET_KEY', 'default_secret_key')
 
 CLIENT_ID = os.getenv('SPOTIFY_CLIENT_ID')
@@ -31,8 +21,6 @@ SPOTIFY_TOKEN_URL = 'https://accounts.spotify.com/api/token'
 SPOTIFY_USER_URL = 'https://api.spotify.com/v1/me'
 SPOTIFY_API_URL = 'https://api.spotify.com/v1/me/player/currently-playing'
 SPOTIFY_CONTROL_URL = 'https://api.spotify.com/v1/me/player'
-
-user_threads = {}
 
 @app.route('/')
 def home():
@@ -52,7 +40,7 @@ def callback():
         'client_id': CLIENT_ID,
         'client_secret': CLIENT_SECRET
     }
-    token_response = requests.post(SPOTIFY_TOKEN_URL, data=data, verify=False)
+    token_response = requests.post(SPOTIFY_TOKEN_URL, data=data)
     token_info = token_response.json()
 
     if 'access_token' not in token_info:
@@ -74,7 +62,7 @@ def callback():
         display_name = user_data.get('display_name') or 'No Name'
         email = user_data.get('email') or 'noemail@example.com'
 
-        supabase.table("users").upsert({
+        result = supabase.table("users").upsert({
             "id": user_id,
             "email": email,
             "display_name": display_name,
@@ -84,13 +72,6 @@ def callback():
 
         session['user_id'] = user_id
         session['access_token'] = access_token
-
-        if user_id not in user_threads:
-            thread = Thread(target=track_poller, args=(user_id, access_token))
-            thread.daemon = True
-            thread.start()
-            user_threads[user_id] = thread
-
     except Exception as e:
         print("User data error:", str(e))
         return jsonify({'error': 'Spotify user data malformed'}), 400
@@ -118,24 +99,25 @@ def dashboard():
         <a href="/logout"><button>Log Out</button></a>
     ''', user_id=user_id, display_name=display_name, email=email)
 
-def track_poller(user_id, access_token):
-    last_track_id = None
-    while True:
-        headers = {'Authorization': f"Bearer {access_token}"}
-        response = requests.get(SPOTIFY_API_URL, headers=headers)
-        if response.status_code == 200:
-            data = response.json()
-            if data and data.get('item'):
-                track_id = data['item']['id']
-                if track_id != last_track_id:
-                    last_track_id = track_id
-                    track_info = {
-                        'name': data['item']['name'],
-                        'artist': data['item']['artists'][0]['name'],
-                        'album_art': data['item']['album']['images'][0]['url']
-                    }
-                    socketio.emit('track_update', track_info)
-        time.sleep(2)
+@app.route('/now-playing')
+def now_playing():
+    access_token = session.get('access_token')
+    if not access_token:
+        return jsonify({'error': 'User not authenticated'}), 401
+
+    headers = {'Authorization': f"Bearer {access_token}"}
+    response = requests.get(SPOTIFY_API_URL, headers=headers)
+
+    if response.status_code == 200 and response.json():
+        track_data = response.json()
+        track_info = {
+            'name': track_data['item']['name'],
+            'artist': track_data['item']['artists'][0]['name'],
+            'album_art': track_data['item']['album']['images'][0]['url']
+        }
+        return jsonify(track_info)
+    else:
+        return jsonify({'error': 'No track playing or token expired'}), 204
 
 @app.route('/logout')
 def logout():
@@ -143,4 +125,4 @@ def logout():
     return redirect('/')
 
 if __name__ == '__main__':
-    socketio.run(app, host='0.0.0.0', port=5000)
+    app.run(host='0.0.0.0', port=5000, debug=True)
